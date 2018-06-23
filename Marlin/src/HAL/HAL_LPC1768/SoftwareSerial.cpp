@@ -37,6 +37,7 @@
 //
 //#include <WInterrupts.h>
 #include "../../inc/MarlinConfig.h"
+#include "../Delay.h"
 #include <stdint.h>
 #include <stdarg.h>
 #include <Arduino.h>
@@ -78,28 +79,9 @@ static const DELAY_TABLE table[] = {
 // Private methods
 //
 
-#if 0
-/* static */
 inline void SoftwareSerial::tunedDelay(const uint32_t count) {
-
-  asm volatile(
-
-    "mov r3, %[loopsPerMicrosecond] \n\t" //load the initial loop counter
-    "1: \n\t"
-    "sub r3, r3, #1 \n\t"
-    "bne 1b \n\t"
-
-    ://empty output list
-    :[loopsPerMicrosecond] "r" (count)
-    :"r3", "cc" //clobber list
-  );
-
+  DELAY_US(count);
 }
-#else
-inline void SoftwareSerial::tunedDelay(const uint32_t count) {
-  delayMicroseconds(count);
-}
-#endif
 
 // This function sets the current object as the "listening"
 // one and returns true if it replaces another
@@ -271,7 +253,7 @@ void SoftwareSerial::end() {
 
 
 // Read data from buffer
-int SoftwareSerial::read() {
+int16_t SoftwareSerial::read() {
   if (!isListening()) return -1;
 
   // Empty buffer?
@@ -283,7 +265,7 @@ int SoftwareSerial::read() {
   return d;
 }
 
-int SoftwareSerial::available() {
+size_t SoftwareSerial::available() {
   if (!isListening()) return 0;
 
   return (_receive_buffer_tail + _SS_MAX_RX_BUFF - _receive_buffer_head) % _SS_MAX_RX_BUFF;
@@ -332,7 +314,7 @@ void SoftwareSerial::flush() {
   sei();
 }
 
-int SoftwareSerial::peek() {
+int16_t SoftwareSerial::peek() {
   if (!isListening())
     return -1;
 
