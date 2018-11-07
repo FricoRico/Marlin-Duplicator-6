@@ -50,6 +50,7 @@
 #define MSG_AUTO_HOME_X                     _UxGT("Home X")
 #define MSG_AUTO_HOME_Y                     _UxGT("Home Y")
 #define MSG_AUTO_HOME_Z                     _UxGT("Home Z")
+#define MSG_TMC_Z_CALIBRATION               _UxGT("Kalibriere Z")
 #define MSG_LEVEL_BED_HOMING                _UxGT("Home XYZ")
 #define MSG_LEVEL_BED_WAITING               _UxGT("Klick für Start")
 #define MSG_LEVEL_BED_NEXT_POINT            _UxGT("Nächste Koordinate")
@@ -311,8 +312,7 @@
 #define MSG_UBL_STEP_BY_STEP_MENU         _UxGT("Schrittweises UBL")
 
 #define MSG_LED_CONTROL                     _UxGT("LED Kontrolle")
-#define MSG_LEDS_ON                         _UxGT("Licht an")
-#define MSG_LEDS_OFF                        _UxGT("Licht aus")
+#define MSG_LEDS                            _UxGT("Licht")
 #define MSG_LED_PRESETS                     _UxGT("Licht Einstellungen")
 #define MSG_SET_LEDS_RED                    _UxGT("Rot")
 #define MSG_SET_LEDS_ORANGE                 _UxGT("Orange")
