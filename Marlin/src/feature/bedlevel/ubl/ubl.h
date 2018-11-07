@@ -19,9 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-#ifndef UNIFIED_BED_LEVELING_H
-#define UNIFIED_BED_LEVELING_H
+#pragma once
 
 //#define UBL_DEVEL_DEBUGGING
 
@@ -40,9 +38,9 @@
 // ubl_motion.cpp
 
 #if ENABLED(UBL_DEVEL_DEBUGGING)
-  void debug_current_and_destination(const char * const title);
+  void debug_current_and_destination(PGM_P const title);
 #else
-  FORCE_INLINE void debug_current_and_destination(const char * const title) { UNUSED(title); }
+  FORCE_INLINE void debug_current_and_destination(PGM_P const title) { UNUSED(title); }
 #endif
 
 // ubl_G29.cpp
@@ -157,7 +155,7 @@ class unified_bed_leveling {
                               MESH_MIN_Y + 14 * (MESH_Y_DIST), MESH_MIN_Y + 15 * (MESH_Y_DIST)
                             };
 
-    #if ENABLED(ULTIPANEL)
+    #if HAS_LCD_MENU
       static bool lcd_map_control;
     #endif
 
@@ -215,7 +213,7 @@ class unified_bed_leveling {
      * z_correction_for_x_on_horizontal_mesh_line is an optimization for
      * the case where the printer is making a vertical line that only crosses horizontal mesh lines.
      */
-    inline static float z_correction_for_x_on_horizontal_mesh_line(const float &rx0, const int x1_i, const int yi) {
+    static inline float z_correction_for_x_on_horizontal_mesh_line(const float &rx0, const int x1_i, const int yi) {
       if (!WITHIN(x1_i, 0, GRID_MAX_POINTS_X - 1) || !WITHIN(yi, 0, GRID_MAX_POINTS_Y - 1)) {
         #if ENABLED(DEBUG_LEVELING_FEATURE)
           if (DEBUGGING(LEVELING)) {
@@ -249,7 +247,7 @@ class unified_bed_leveling {
     //
     // See comments above for z_correction_for_x_on_horizontal_mesh_line
     //
-    inline static float z_correction_for_y_on_vertical_mesh_line(const float &ry0, const int xi, const int y1_i) {
+    static inline float z_correction_for_y_on_vertical_mesh_line(const float &ry0, const int xi, const int y1_i) {
       if (!WITHIN(xi, 0, GRID_MAX_POINTS_X - 1) || !WITHIN(y1_i, 0, GRID_MAX_POINTS_Y - 1)) {
         #if ENABLED(DEBUG_LEVELING_FEATURE)
           if (DEBUGGING(LEVELING)) {
@@ -362,7 +360,7 @@ class unified_bed_leveling {
       static void line_to_destination_cartesian(const float &fr, const uint8_t e);
     #endif
 
-    inline static bool mesh_is_valid() {
+    static inline bool mesh_is_valid() {
       for (uint8_t x = 0; x < GRID_MAX_POINTS_X; x++)
         for (uint8_t y = 0; y < GRID_MAX_POINTS_Y; y++)
           if (isnan(z_values[x][y])) return false;
@@ -373,4 +371,4 @@ class unified_bed_leveling {
 
 extern unified_bed_leveling ubl;
 
-#endif // UNIFIED_BED_LEVELING_H
+#define Z_VALUES(X,Y) ubl.z_values[X][Y]

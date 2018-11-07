@@ -124,8 +124,8 @@
  *   S #  Nozzle      Used to control the size of nozzle diameter. If not specified, a .4mm nozzle is assumed.
  *
  *   U #  Random      Randomize the order that the circles are drawn on the bed. The search for the closest
- *                    undrawn cicle is still done. But the distance to the location for each circle has a
- *                    random number of the size specified added to it. Specifying S50 will give an interesting
+ *                    un-drawn circle is still done. But the distance to the location for each circle has a
+ *                    random number of the specified size added to it. Specifying S50 will give an interesting
  *                    deviation from the normal behaviour on a 10 x 10 Mesh.
  *
  *   X #  X Coord.    Specify the starting location of the drawing activity.
@@ -156,7 +156,7 @@ int16_t g26_bed_temp,
 
 int8_t g26_prime_flag;
 
-#if ENABLED(ULTIPANEL)
+#if HAS_LCD_MENU
 
   /**
    * If the LCD is clicked, cancel, wait for release, return true
@@ -164,7 +164,7 @@ int8_t g26_prime_flag;
   bool user_canceled() {
     if (!is_lcd_clicked()) return false; // Return if the button isn't pressed
     lcd_setstatusPGM(PSTR("Mesh Validation Stopped."), 99);
-    #if ENABLED(ULTIPANEL)
+    #if HAS_LCD_MENU
       lcd_quick_feedback(true);
     #endif
     wait_for_release();
@@ -232,7 +232,7 @@ void move_to(const float &rx, const float &ry, const float &z, const float &e_de
 
   if (z != last_z) {
     last_z = z;
-    feed_value = planner.max_feedrate_mm_s[Z_AXIS]/(3.0);  // Base the feed rate off of the configured Z_AXIS feed rate
+    feed_value = planner.settings.max_feedrate_mm_s[Z_AXIS]/(3.0);  // Base the feed rate off of the configured Z_AXIS feed rate
 
     destination[X_AXIS] = current_position[X_AXIS];
     destination[Y_AXIS] = current_position[Y_AXIS];
@@ -245,7 +245,7 @@ void move_to(const float &rx, const float &ry, const float &z, const float &e_de
 
   // Check if X or Y is involved in the movement.
   // Yes: a 'normal' movement. No: a retract() or recover()
-  feed_value = has_xy_component ? PLANNER_XY_FEEDRATE() / 10.0 : planner.max_feedrate_mm_s[E_AXIS] / 1.5;
+  feed_value = has_xy_component ? PLANNER_XY_FEEDRATE() / 10.0 : planner.settings.max_feedrate_mm_s[E_AXIS] / 1.5;
 
   if (g26_debug_flag) SERIAL_ECHOLNPAIR("in move_to() feed_value for XY:", feed_value);
 
@@ -327,7 +327,7 @@ inline bool look_for_lines_to_connect() {
   for (uint8_t i = 0; i < GRID_MAX_POINTS_X; i++) {
     for (uint8_t j = 0; j < GRID_MAX_POINTS_Y; j++) {
 
-      #if ENABLED(ULTIPANEL)
+      #if HAS_LCD_MENU
         if (user_canceled()) return true;     // Check if the user wants to stop the Mesh Validation
       #endif
 
@@ -418,14 +418,14 @@ inline bool turn_on_heaters() {
       if (g26_bed_temp > 25) {
         lcd_setstatusPGM(PSTR("G26 Heating Bed."), 99);
         lcd_quick_feedback(true);
-        #if ENABLED(ULTIPANEL)
+        #if HAS_LCD_MENU
           lcd_external_control = true;
         #endif
     #endif
         thermalManager.setTargetBed(g26_bed_temp);
         while (ABS(thermalManager.degBed() - g26_bed_temp) > 3) {
 
-          #if ENABLED(ULTIPANEL)
+          #if HAS_LCD_MENU
             if (is_lcd_clicked()) return exit_from_g26();
           #endif
 
@@ -448,7 +448,7 @@ inline bool turn_on_heaters() {
   thermalManager.setTargetHotend(g26_hotend_temp, 0);
   while (ABS(thermalManager.degHotend(0) - g26_hotend_temp) > 3) {
 
-    #if ENABLED(ULTIPANEL)
+    #if HAS_LCD_MENU
       if (is_lcd_clicked()) return exit_from_g26();
     #endif
 
@@ -474,8 +474,10 @@ inline bool turn_on_heaters() {
  */
 inline bool prime_nozzle() {
 
-  #if ENABLED(ULTIPANEL)
-    float Total_Prime = 0.0;
+  #if HAS_LCD_MENU
+    #if ENABLED(PREVENT_LENGTHY_EXTRUDE)
+      float Total_Prime = 0.0;
+    #endif
 
     if (g26_prime_flag == -1) {  // The user wants to control how much filament gets purged
 
@@ -490,11 +492,11 @@ inline bool prime_nozzle() {
       while (!is_lcd_clicked()) {
         lcd_chirp();
         destination[E_AXIS] += 0.25;
-        #ifdef PREVENT_LENGTHY_EXTRUDE
+        #if ENABLED(PREVENT_LENGTHY_EXTRUDE)
           Total_Prime += 0.25;
           if (Total_Prime >= EXTRUDE_MAXLENGTH) return G26_ERR;
         #endif
-        G26_line_to_destination(planner.max_feedrate_mm_s[E_AXIS] / 15.0);
+        G26_line_to_destination(planner.settings.max_feedrate_mm_s[E_AXIS] / 15.0);
         set_destination_from_current();
         planner.synchronize();    // Without this synchronize, the purge is more consistent,
                                   // but because the planner has a buffer, we won't be able
@@ -517,7 +519,7 @@ inline bool prime_nozzle() {
     #endif
     set_destination_from_current();
     destination[E_AXIS] += g26_prime_length;
-    G26_line_to_destination(planner.max_feedrate_mm_s[E_AXIS] / 15.0);
+    G26_line_to_destination(planner.settings.max_feedrate_mm_s[E_AXIS] / 15.0);
     set_destination_from_current();
     retract_filament(destination);
   }
@@ -617,7 +619,7 @@ void GcodeSuite::G26() {
 
   if (parser.seen('P')) {
     if (!parser.has_value()) {
-      #if ENABLED(ULTIPANEL)
+      #if HAS_LCD_MENU
         g26_prime_flag = -1;
       #else
         SERIAL_PROTOCOLLNPGM("?Prime length must be specified when not using an LCD.");
@@ -662,7 +664,7 @@ void GcodeSuite::G26() {
   }
 
   int16_t g26_repeats;
-  #if ENABLED(ULTIPANEL)
+  #if HAS_LCD_MENU
     g26_repeats = parser.intval('R', GRID_MAX_POINTS + 1);
   #else
     if (!parser.seen('R')) {
@@ -721,7 +723,7 @@ void GcodeSuite::G26() {
   move_to(destination, 0.0);
   move_to(destination, g26_ooze_amount);
 
-  #if ENABLED(ULTIPANEL)
+  #if HAS_LCD_MENU
     lcd_external_control = true;
   #endif
 
@@ -777,25 +779,25 @@ void GcodeSuite::G26() {
         if (xi == 0) {                             // left edge
           sx = f ? circle_x + INTERSECTION_CIRCLE_RADIUS : circle_x;
           ex = b ? circle_x + INTERSECTION_CIRCLE_RADIUS : circle_x;
-          sy = f ? circle_y : circle_y - INTERSECTION_CIRCLE_RADIUS;
+          sy = f ? circle_y : circle_y - (INTERSECTION_CIRCLE_RADIUS);
           ey = b ? circle_y : circle_y + INTERSECTION_CIRCLE_RADIUS;
           arc_length = (f || b) ? ARC_LENGTH(1) : ARC_LENGTH(2);
         }
         else if (r) {                             // right edge
-          sx = b ? circle_x - INTERSECTION_CIRCLE_RADIUS : circle_x;
-          ex = f ? circle_x - INTERSECTION_CIRCLE_RADIUS : circle_x;
+          sx = b ? circle_x - (INTERSECTION_CIRCLE_RADIUS) : circle_x;
+          ex = f ? circle_x - (INTERSECTION_CIRCLE_RADIUS) : circle_x;
           sy = b ? circle_y : circle_y + INTERSECTION_CIRCLE_RADIUS;
-          ey = f ? circle_y : circle_y - INTERSECTION_CIRCLE_RADIUS;
+          ey = f ? circle_y : circle_y - (INTERSECTION_CIRCLE_RADIUS);
           arc_length = (f || b) ? ARC_LENGTH(1) : ARC_LENGTH(2);
         }
         else if (f) {
           sx = circle_x + INTERSECTION_CIRCLE_RADIUS;
-          ex = circle_x - INTERSECTION_CIRCLE_RADIUS;
+          ex = circle_x - (INTERSECTION_CIRCLE_RADIUS);
           sy = ey = circle_y;
           arc_length = ARC_LENGTH(2);
         }
         else if (b) {
-          sx = circle_x - INTERSECTION_CIRCLE_RADIUS;
+          sx = circle_x - (INTERSECTION_CIRCLE_RADIUS);
           ex = circle_x + INTERSECTION_CIRCLE_RADIUS;
           sy = ey = circle_y;
           arc_length = ARC_LENGTH(2);
@@ -829,7 +831,7 @@ void GcodeSuite::G26() {
         plan_arc(endpoint, arc_offset, false);  // Draw a counter-clockwise arc
         feedrate_mm_s = save_feedrate;
         set_destination_from_current();
-        #if ENABLED(ULTIPANEL)
+        #if HAS_LCD_MENU
           if (user_canceled()) goto LEAVE; // Check if the user wants to stop the Mesh Validation
         #endif
 
@@ -855,7 +857,7 @@ void GcodeSuite::G26() {
 
         for (int8_t ind = start_ind; ind <= end_ind; ind++) {
 
-          #if ENABLED(ULTIPANEL)
+          #if HAS_LCD_MENU
             if (user_canceled()) goto LEAVE;          // Check if the user wants to stop the Mesh Validation
           #endif
 
@@ -904,7 +906,7 @@ void GcodeSuite::G26() {
   move_to(destination, 0); // Move back to the starting position
   //debug_current_and_destination(PSTR("done doing X/Y move."));
 
-  #if ENABLED(ULTIPANEL)
+  #if HAS_LCD_MENU
     lcd_external_control = false;     // Give back control of the LCD Panel!
   #endif
 

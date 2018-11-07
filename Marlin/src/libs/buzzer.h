@@ -19,9 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-#ifndef __BUZZER_H__
-#define __BUZZER_H__
+#pragma once
 
 #include "../inc/MarlinConfig.h"
 
@@ -82,7 +80,7 @@ class Buzzer {
      * @brief Resets the state of the class
      * @details Brings the class state to a known one.
      */
-    inline static void reset() {
+    static inline void reset() {
       off();
       state.endtime = 0;
     }
@@ -121,7 +119,5 @@ class Buzzer {
 #else // No buzz capability
 
   #define BUZZ(d,f) NOOP
-
-#endif
 
 #endif
