@@ -19,14 +19,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#pragma once
 
 /**
  * Conditionals_LCD.h
  * Conditionals that need to be set before Configuration_adv.h or pins.h
  */
-
-#ifndef CONDITIONALS_LCD_H // Get the LCD defines which are needed first
-#define CONDITIONALS_LCD_H
 
 #define LCD_HAS_DIRECTIONAL_BUTTONS (BUTTON_EXISTS(UP) || BUTTON_EXISTS(DWN) || BUTTON_EXISTS(LFT) || BUTTON_EXISTS(RT))
 
@@ -44,9 +42,9 @@
 
 #elif ENABLED(ZONESTAR_LCD)
 
+  #define ADC_KEYPAD
   #define REPRAPWORLD_KEYPAD
   #define REPRAPWORLD_KEYPAD_MOVE_STEP 10.0
-  #define ADC_KEYPAD
   #define ADC_KEY_NUM 8
   #define ULTIPANEL
 
@@ -298,7 +296,13 @@
   #define ULTIPANEL
 #endif
 
-#if ENABLED(DOGLCD) // Change number of lines to match the DOG graphic display
+#if ENABLED(NO_LCD_MENUS)
+  #undef ULTIPANEL
+#endif
+
+#define HAS_GRAPHICAL_LCD ENABLED(DOGLCD)
+
+#if HAS_GRAPHICAL_LCD
   #ifndef LCD_WIDTH
     #ifdef LCD_WIDTH_OVERRIDE
       #define LCD_WIDTH LCD_WIDTH_OVERRIDE
@@ -309,10 +313,6 @@
   #ifndef LCD_HEIGHT
     #define LCD_HEIGHT 5
   #endif
-#endif
-
-#if ENABLED(NO_LCD_MENUS)
-  #undef ULTIPANEL
 #endif
 
 #if ENABLED(ULTIPANEL)
@@ -333,7 +333,14 @@
   #endif
 #endif
 
-#if ENABLED(DOGLCD)
+// Aliases for LCD features
+#define HAS_SPI_LCD          ENABLED(ULTRA_LCD)
+#define HAS_CHARACTER_LCD   (ENABLED(ULTRA_LCD) && DISABLED(DOGLCD))
+#define HAS_DIGITAL_ENCODER (HAS_SPI_LCD && ENABLED(NEWPANEL))
+#define HAS_LCD_MENU         ENABLED(ULTIPANEL)
+#define HAS_DEBUG_MENU      (HAS_LCD_MENU && ENABLED(LCD_PROGRESS_BAR_TEST))
+
+#if HAS_GRAPHICAL_LCD
   /* Custom characters defined in font Marlin_symbols.fon which was merged to ISO10646-0-3.bdf */
   // \x00 intentionally skipped to avoid problems in strings
   #define LCD_STR_REFRESH     "\x01"
@@ -369,7 +376,7 @@
 /**
  * Default LCD contrast for dogm-like LCD displays
  */
-#if ENABLED(DOGLCD)
+#if HAS_GRAPHICAL_LCD
 
   #define HAS_LCD_CONTRAST ( \
       ENABLED(MAKRPANEL) \
@@ -394,13 +401,11 @@
 #endif
 
 // Boot screens
-#if DISABLED(ULTRA_LCD)
+#if !HAS_SPI_LCD
   #undef SHOW_BOOTSCREEN
 #elif !defined(BOOTSCREEN_TIMEOUT)
   #define BOOTSCREEN_TIMEOUT 2500
 #endif
-
-#define HAS_DEBUG_MENU (ENABLED(ULTIPANEL) && ENABLED(LCD_PROGRESS_BAR_TEST))
 
 /**
  * Extruders have some combination of stepper motors and hotends
@@ -423,11 +428,10 @@
   #if DISABLED(SWITCHING_NOZZLE)
     #define HOTENDS       E_STEPPERS
   #endif
-  #define E_MANUAL        EXTRUDERS
 #elif ENABLED(MIXING_EXTRUDER)
   #define E_STEPPERS      MIXING_STEPPERS
   #define E_MANUAL        1
-#else
+#elif ENABLED(SWITCHING_TOOLHEAD)
   #define E_STEPPERS      EXTRUDERS
   #define E_MANUAL        EXTRUDERS
 #endif
@@ -454,20 +458,30 @@
   #define HOTENDS EXTRUDERS
 #endif
 
+#ifndef E_STEPPERS
+  #define E_STEPPERS EXTRUDERS
+#endif
+
+#ifndef E_MANUAL
+  #define E_MANUAL EXTRUDERS
+#endif
+
 #define HOTEND_LOOP() for (int8_t e = 0; e < HOTENDS; e++)
 
 #define DO_SWITCH_EXTRUDER (ENABLED(SWITCHING_EXTRUDER) && (DISABLED(SWITCHING_NOZZLE) || SWITCHING_EXTRUDER_SERVO_NR != SWITCHING_NOZZLE_SERVO_NR))
+
+#define HAS_HOTEND_OFFSET (HOTENDS > 1)
 
 /**
  * DISTINCT_E_FACTORS affects how some E factors are accessed
  */
 #if ENABLED(DISTINCT_E_FACTORS) && E_STEPPERS > 1
   #define XYZE_N (XYZ + E_STEPPERS)
-  #define E_AXIS_N (E_AXIS + extruder)
+  #define E_AXIS_N(E) (E_AXIS + E)
 #else
   #undef DISTINCT_E_FACTORS
   #define XYZE_N XYZE
-  #define E_AXIS_N E_AXIS
+  #define E_AXIS_N(E) E_AXIS
 #endif
 
 /**
@@ -511,6 +525,14 @@
   #endif
 #endif
 
+#ifndef PREHEAT_1_LABEL
+  #define PREHEAT_1_LABEL "PLA"
+#endif
+
+#ifndef PREHEAT_2_LABEL
+  #define PREHEAT_2_LABEL "ABS"
+#endif
+
 /**
  * Set a flag for a servo probe
  */
@@ -519,22 +541,37 @@
 /**
  * Set flags for enabled probes
  */
-#define HAS_BED_PROBE (ENABLED(FIX_MOUNTED_PROBE) || ENABLED(Z_PROBE_ALLEN_KEY) || HAS_Z_SERVO_PROBE || ENABLED(Z_PROBE_SLED) || ENABLED(SOLENOID_PROBE))
+#define HAS_BED_PROBE (ENABLED(FIX_MOUNTED_PROBE) || ENABLED(Z_PROBE_ALLEN_KEY) || HAS_Z_SERVO_PROBE || ENABLED(Z_PROBE_SLED) || ENABLED(SOLENOID_PROBE) || ENABLED(SENSORLESS_PROBING) || ENABLED(RACK_AND_PINION_PROBE))
 #define PROBE_SELECTED (HAS_BED_PROBE || ENABLED(PROBE_MANUALLY) || ENABLED(MESH_BED_LEVELING))
 
-#if !HAS_BED_PROBE
+#if HAS_BED_PROBE
+  #ifndef Z_PROBE_LOW_POINT
+    #define Z_PROBE_LOW_POINT -5
+  #endif
+  #if ENABLED(Z_PROBE_ALLEN_KEY)
+    #define PROBE_TRIGGERED_WHEN_STOWED_TEST // Extra test for Allen Key Probe
+  #endif
+#else
   // Clear probe pin settings when no probe is selected
   #undef Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN
   #undef Z_MIN_PROBE_ENDSTOP
-#elif ENABLED(Z_PROBE_ALLEN_KEY)
-  // Extra test for Allen Key Probe
-  #define PROBE_IS_TRIGGERED_WHEN_STOWED_TEST
 #endif
 
 #define HOMING_Z_WITH_PROBE (HAS_BED_PROBE && Z_HOME_DIR < 0 && ENABLED(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN))
 
-#define HAS_SOFTWARE_ENDSTOPS (ENABLED(MIN_SOFTWARE_ENDSTOPS) || ENABLED(MAX_SOFTWARE_ENDSTOPS))
-#define HAS_RESUME_CONTINUE (ENABLED(NEWPANEL) || ENABLED(EMERGENCY_PARSER))
-#define HAS_COLOR_LEDS (ENABLED(BLINKM) || ENABLED(RGB_LED) || ENABLED(RGBW_LED) || ENABLED(PCA9632) || ENABLED(NEOPIXEL_LED))
+#ifdef GRID_MAX_POINTS_X
+  #define GRID_MAX_POINTS ((GRID_MAX_POINTS_X) * (GRID_MAX_POINTS_Y))
+#endif
 
-#endif // CONDITIONALS_LCD_H
+#define HAS_SOFTWARE_ENDSTOPS (ENABLED(MIN_SOFTWARE_ENDSTOPS) || ENABLED(MAX_SOFTWARE_ENDSTOPS))
+#define HAS_RESUME_CONTINUE (ENABLED(EXTENSIBLE_UI) || ENABLED(NEWPANEL) || ENABLED(EMERGENCY_PARSER))
+#define HAS_COLOR_LEDS (ENABLED(BLINKM) || ENABLED(RGB_LED) || ENABLED(RGBW_LED) || ENABLED(PCA9632) || ENABLED(NEOPIXEL_LED))
+#define HAS_LEDS_OFF_FLAG (ENABLED(PRINTER_EVENT_LEDS) && ENABLED(SDSUPPORT) && HAS_RESUME_CONTINUE)
+#define HAS_PRINT_PROGRESS (ENABLED(SDSUPPORT) || ENABLED(LCD_SET_PROGRESS_MANUALLY))
+
+#define Z_MULTI_STEPPER_DRIVERS (ENABLED(Z_DUAL_STEPPER_DRIVERS) || ENABLED(Z_TRIPLE_STEPPER_DRIVERS))
+#define Z_MULTI_ENDSTOPS (ENABLED(Z_DUAL_ENDSTOPS) || ENABLED(Z_TRIPLE_ENDSTOPS))
+
+#define IS_SCARA     (ENABLED(MORGAN_SCARA) || ENABLED(MAKERARM_SCARA))
+#define IS_KINEMATIC (ENABLED(DELTA) || IS_SCARA)
+#define IS_CARTESIAN !IS_KINEMATIC

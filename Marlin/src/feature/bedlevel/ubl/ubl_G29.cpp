@@ -29,6 +29,7 @@
   #include "ubl.h"
 
   #include "../../../Marlin.h"
+  #include "../../../HAL/shared/persistent_store_api.h"
   #include "../../../libs/hex_print_routines.h"
   #include "../../../module/configuration_store.h"
   #include "../../../lcd/ultralcd.h"
@@ -51,7 +52,7 @@
 
   extern float destination[XYZE], current_position[XYZE];
 
-  #if ENABLED(NEWPANEL)
+  #if HAS_LCD_MENU
     void lcd_return_to_status();
     void _lcd_ubl_output_map_lcd();
   #endif
@@ -303,10 +304,10 @@
 
     // Check for commands that require the printer to be homed
     if (may_move) {
+      if (axis_unhomed_error()) gcode.home_all_axes();
       #if ENABLED(DUAL_X_CARRIAGE)
         if (active_extruder != 0) tool_change(0);
       #endif
-      if (axis_unhomed_error()) gcode.home_all_axes();
     }
 
     // Invalidate Mesh Points. This command is a little bit asymmetrical because
@@ -431,7 +432,7 @@
         #endif // HAS_BED_PROBE
 
         case 2: {
-          #if ENABLED(NEWPANEL)
+          #if HAS_LCD_MENU
             //
             // Manually Probe Mesh in areas that can't be reached by the probe
             //
@@ -539,7 +540,7 @@
         }
 
         case 4: // Fine Tune (i.e., Edit) the Mesh
-          #if ENABLED(NEWPANEL)
+          #if HAS_LCD_MENU
             fine_tune_mesh(g29_x_pos, g29_y_pos, parser.seen('T'));
           #else
             SERIAL_PROTOCOLLNPGM("?P4 is only available when an LCD is present.");
@@ -627,7 +628,7 @@
 
     LEAVE:
 
-    #if ENABLED(NEWPANEL)
+    #if HAS_LCD_MENU
       lcd_reset_alert_level();
       lcd_quick_feedback(true);
       lcd_reset_status();
@@ -682,7 +683,7 @@
           z_values[x][y] += g29_constant;
   }
 
-  #if ENABLED(NEWPANEL)
+  #if HAS_LCD_MENU
 
     typedef void (*clickFunc_t)();
 
@@ -706,7 +707,7 @@
       return false;
     }
 
-  #endif // NEWPANEL
+  #endif // HAS_LCD_MENU
 
   #if HAS_BED_PROBE
     /**
@@ -716,7 +717,7 @@
     void unified_bed_leveling::probe_entire_mesh(const float &rx, const float &ry, const bool do_ubl_mesh_map, const bool stow_probe, const bool do_furthest) {
       mesh_index_pair location;
 
-      #if ENABLED(NEWPANEL)
+      #if HAS_LCD_MENU
         lcd_external_control = true;
       #endif
 
@@ -728,7 +729,7 @@
       do {
         if (do_ubl_mesh_map) display_map(g29_map_type);
 
-        #if ENABLED(NEWPANEL)
+        #if HAS_LCD_MENU
           if (is_lcd_clicked()) {
             SERIAL_PROTOCOLLNPGM("\nMesh only partially populated.\n");
             lcd_quick_feedback(false);
@@ -774,7 +775,7 @@
 
   #endif // HAS_BED_PROBE
 
-  #if ENABLED(NEWPANEL)
+  #if HAS_LCD_MENU
 
     void unified_bed_leveling::move_z_with_encoder(const float &multiplier) {
       wait_for_release();
@@ -802,7 +803,7 @@
       save_ubl_active_state_and_disable();   // Disable bed level correction for probing
 
       do_blocking_move_to(0.5f * (MESH_MAX_X - (MESH_MIN_X)), 0.5f * (MESH_MAX_Y - (MESH_MIN_Y)), in_height);
-        //, MIN(planner.max_feedrate_mm_s[X_AXIS], planner.max_feedrate_mm_s[Y_AXIS]) * 0.5f);
+        //, MIN(planner.settings.max_feedrate_mm_s[X_AXIS], planner.settings.max_feedrate_mm_s[Y_AXIS]) * 0.5f);
       planner.synchronize();
 
       SERIAL_PROTOCOLPGM("Place shim under nozzle");
@@ -907,12 +908,12 @@
       KEEPALIVE_STATE(IN_HANDLER);
       do_blocking_move_to(rx, ry, Z_CLEARANCE_DEPLOY_PROBE);
     }
-  #endif // NEWPANEL
+  #endif // HAS_LCD_MENU
 
   bool unified_bed_leveling::g29_parameter_parsing() {
     bool err_flag = false;
 
-    #if ENABLED(NEWPANEL)
+    #if HAS_LCD_MENU
       LCD_MESSAGEPGM(MSG_UBL_DOING_G29);
       lcd_quick_feedback(true);
     #endif
@@ -1026,16 +1027,16 @@
 
   static uint8_t ubl_state_at_invocation = 0;
 
-  #ifdef UBL_DEVEL_DEBUGGING
+  #if ENABLED(UBL_DEVEL_DEBUGGING)
     static uint8_t ubl_state_recursion_chk = 0;
   #endif
 
   void unified_bed_leveling::save_ubl_active_state_and_disable() {
-    #ifdef UBL_DEVEL_DEBUGGING
+    #if ENABLED(UBL_DEVEL_DEBUGGING)
       ubl_state_recursion_chk++;
       if (ubl_state_recursion_chk != 1) {
         SERIAL_ECHOLNPGM("save_ubl_active_state_and_disabled() called multiple times in a row.");
-        #if ENABLED(NEWPANEL)
+        #if HAS_LCD_MENU
           LCD_MESSAGEPGM(MSG_UBL_SAVE_ERROR);
           lcd_quick_feedback(true);
         #endif
@@ -1047,10 +1048,10 @@
   }
 
   void unified_bed_leveling::restore_ubl_active_state_and_leave() {
-    #ifdef UBL_DEVEL_DEBUGGING
+    #if ENABLED(UBL_DEVEL_DEBUGGING)
       if (--ubl_state_recursion_chk) {
         SERIAL_ECHOLNPGM("restore_ubl_active_state_and_leave() called too many times.");
-        #if ENABLED(NEWPANEL)
+        #if HAS_LCD_MENU
           LCD_MESSAGEPGM(MSG_UBL_RESTORE_ERROR);
           lcd_quick_feedback(true);
         #endif
@@ -1131,7 +1132,7 @@
     SERIAL_EOL();
     safe_delay(50);
 
-    #ifdef UBL_DEVEL_DEBUGGING
+    #if ENABLED(UBL_DEVEL_DEBUGGING)
       SERIAL_PROTOCOLLNPAIR("ubl_state_at_invocation :", ubl_state_at_invocation);
       SERIAL_EOL();
       SERIAL_PROTOCOLLNPAIR("ubl_state_recursion_chk :", ubl_state_recursion_chk);
@@ -1167,24 +1168,24 @@
    * right now, it is good to have the extra information. Soon... we prune this.
    */
   void unified_bed_leveling::g29_eeprom_dump() {
-    unsigned char cccc;
-    unsigned int  kkkk;  // Needs to be of unspecfied size to compile clean on all platforms
+    uint8_t cccc;
 
     SERIAL_ECHO_START();
     SERIAL_ECHOLNPGM("EEPROM Dump:");
-    for (uint16_t i = 0; i <= E2END; i += 16) {
+    persistentStore.access_start();
+    for (uint16_t i = 0; i < persistentStore.capacity(); i += 16) {
       if (!(i & 0x3)) idle();
       print_hex_word(i);
       SERIAL_ECHOPGM(": ");
       for (uint16_t j = 0; j < 16; j++) {
-        kkkk = i + j;
-        eeprom_read_block(&cccc, (const void *)kkkk, sizeof(unsigned char));
+        persistentStore.read_data(i + j, &cccc, sizeof(uint8_t));
         print_hex_byte(cccc);
         SERIAL_ECHO(' ');
       }
       SERIAL_EOL();
     }
     SERIAL_EOL();
+    persistentStore.access_finish();
   }
 
   /**
@@ -1338,7 +1339,7 @@
     return out_mesh;
   }
 
-  #if ENABLED(NEWPANEL)
+  #if HAS_LCD_MENU
 
     void abort_fine_tune() {
       lcd_return_to_status();
@@ -1449,7 +1450,7 @@
         lcd_return_to_status();
     }
 
-  #endif // NEWPANEL
+  #endif // HAS_LCD_MENU
 
   /**
    * 'Smart Fill': Scan from the outward edges of the mesh towards the center.

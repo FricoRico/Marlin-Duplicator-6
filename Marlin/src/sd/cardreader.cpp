@@ -33,6 +33,10 @@
 #include "../core/language.h"
 #include "../gcode/queue.h"
 
+#if ENABLED(EMERGENCY_PARSER)
+  #include "../feature/emergency_parser.h"
+#endif
+
 #if ENABLED(POWER_LOSS_RECOVERY)
   #include "../feature/power_loss_recovery.h"
 #endif
@@ -322,7 +326,7 @@ void CardReader::initsd() {
 }
 
 void CardReader::release() {
-  sdprinting = false;
+  stopSDPrint();
   cardOK = false;
 }
 
@@ -351,7 +355,7 @@ void CardReader::stopSDPrint(
   #if ENABLED(ADVANCED_PAUSE_FEATURE)
     did_pause_print = 0;
   #endif
-  sdprinting = false;
+  sdprinting = abort_sd_printing = false;
   if (isFileOpen()) file.close();
   #if SD_RESORT
     if (re_sort) presort();
@@ -394,7 +398,7 @@ void CardReader::openFile(char * const path, const bool read, const bool subcall
         SERIAL_ERROR_START();
         SERIAL_ERRORPGM("trying to call sub-gcode files with too many levels. MAX level is:");
         SERIAL_ERRORLN((int)SD_PROCEDURE_DEPTH);
-        kill(PSTR(MSG_KILLED));
+        kill();
         return;
       }
 
@@ -461,7 +465,11 @@ void CardReader::openFile(char * const path, const bool read, const bool subcall
     }
     else {
       saving = true;
-      SERIAL_PROTOCOLLNPAIR(MSG_SD_WRITE_TO_FILE, path);
+      getfilename(0, fname);
+      #if ENABLED(EMERGENCY_PARSER)
+        emergency_parser.disable();
+      #endif
+      SERIAL_PROTOCOLLNPAIR(MSG_SD_WRITE_TO_FILE, fname);
       lcd_setstatus(fname);
     }
   }
@@ -544,8 +552,8 @@ void CardReader::checkautostart() {
       && !jobRecoverFileExists() // Don't run auto#.g when a resume file exists
     #endif
   ) {
-    char autoname[10];
-    sprintf_P(autoname, PSTR("auto%i.g"), int(autostart_index));
+    char autoname[8];
+    sprintf_P(autoname, PSTR("auto%c.g"), autostart_index + '0');
     dir_t p;
     root.rewind();
     while (root.readDir(&p, NULL) > 0) {
@@ -569,6 +577,9 @@ void CardReader::closefile(const bool store_location) {
   file.sync();
   file.close();
   saving = logging = false;
+  #if ENABLED(EMERGENCY_PARSER)
+    emergency_parser.enable();
+  #endif
 
   if (store_location) {
     //future: store printer state, filename and position for continuing a stopped print
@@ -936,7 +947,7 @@ void CardReader::printingHasFinished() {
     startFileprint();
   }
   else {
-    sdprinting = false;
+    stopSDPrint();
 
     #if ENABLED(POWER_LOSS_RECOVERY)
       removeJobRecoveryFile();
